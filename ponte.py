@@ -8,8 +8,8 @@ Depois, em outro Terminal:  tailscale funnel 8787
 Segurança:
 - Só aceita pedidos com a chave guardada em ~/.cwb-ponte/chave (criada na 1a vez).
 - Só aceita a página do app (github.io do André) via CORS.
-- O Claude roda SEM ferramentas: só conversa. Não manda mensagem, não mexe
-  em arquivo, CRM nem compra nada. Ações continuam passando pela pinça.
+- O Claude roda SEM ferramentas e SEM servidores MCP (Gmail, CRM, SMS, anúncios):
+  só conversa. Não manda mensagem, não lê nem mexe em arquivo, CRM ou compra.
 """
 import hmac, json, os, secrets, shutil, subprocess, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -44,11 +44,14 @@ sessao = {"id": None}
 ultimos = []  # limite simples de pedidos
 
 def perguntar(texto, tela_atual):
+    # Só conversa: nenhuma ferramenta do Claude Code, nenhum servidor MCP (Gmail, CRM, SMS, anúncios),
+    # e tudo que pedir permissão é negado. Assim nada sai, nada é lido e nada muda.
     cmd = [CLAUDE, "-p", f"[tela atual: {tela_atual}] {texto}",
-           "--output-format", "json", "--max-turns", "1",
-           "--append-system-prompt", INSTRUCOES,
-           "--disallowedTools", "Bash", "Edit", "Write", "NotebookEdit",
-           "WebFetch", "WebSearch", "Task"]
+           "--output-format", "json",
+           "--tools", "",
+           "--strict-mcp-config",
+           "--permission-mode", "dontAsk",
+           "--append-system-prompt", INSTRUCOES]
     if sessao["id"]:
         cmd += ["--resume", sessao["id"]]
     # Sem chave de API: força o uso da assinatura, nunca cobrança por API.
