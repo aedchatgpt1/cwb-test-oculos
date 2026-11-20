@@ -121,7 +121,43 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, fmt, *a):
         sys.stderr.write("%s %s\n" % (time.strftime("%H:%M:%S"), fmt % a))
 
+def tailscale():
+    for c in (shutil.which("tailscale"), "/Applications/Tailscale.app/Contents/MacOS/Tailscale"):
+        if c and os.path.exists(c):
+            return c
+    return None
+
+def abrir_funnel():
+    """Abre a porta da ponte na internet pelo Tailscale Funnel (grátis) e devolve o endereço."""
+    ts = tailscale()
+    if not ts:
+        print("Não achei o Tailscale. Abra o app Tailscale e rode de novo.")
+        return None
+    try:
+        st = json.loads(subprocess.run([ts, "status", "--json"], capture_output=True, text=True, timeout=20).stdout)
+        nome = st["Self"]["DNSName"].rstrip(".")
+    except Exception as e:
+        print("Não consegui ler o nome do Mac no Tailscale:", e)
+        return None
+    r = subprocess.run([ts, "funnel", "--bg", str(PORTA)], capture_output=True, text=True, timeout=60)
+    saida = (r.stdout + r.stderr).strip()
+    if saida:
+        print(saida)
+    if r.returncode != 0:
+        print("\nO Funnel ainda não está liberado. Abra o link acima, aprove e rode a ponte de novo.")
+        return None
+    return "https://" + nome
+
 if __name__ == "__main__":
     print(f"Ponte CWB ligada em 127.0.0.1:{PORTA}")
-    print(f"Chave (vai no endereço do app, não mostre a ninguém): {CHAVE}")
+    end = abrir_funnel()
+    if end:
+        app = f"https://aedchatgpt1.github.io/cwb-test-oculos/?ponte={end}&chave={CHAVE}"
+        try:
+            subprocess.run(["pbcopy"], input=app, text=True, timeout=5)
+            print("\nPRONTO. O endereço do app com a chave já está copiado.")
+            print("No iPhone, cole no app Meta AI, em Web Apps, no lugar do endereço atual.")
+        except Exception:
+            print("\nEndereço do app (cole no Meta AI):\n" + app)
+    print("\nDeixe esta janela aberta. Para desligar: Control+C.")
     ThreadingHTTPServer(("127.0.0.1", PORTA), H).serve_forever()
