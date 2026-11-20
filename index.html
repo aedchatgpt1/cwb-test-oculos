@@ -1,10 +1,15 @@
 <!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
-<meta name="viewport" content="width=600,height=600,initial-scale=1">
+<meta name="viewport" content="width=600, height=600, initial-scale=1.0, user-scalable=no">
+<meta name="application-name" content="CWB Lente">
+<meta name="description" content="Teste da CWB na lente, só com dados fictícios.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-96.png" sizes="96x96">
+<link rel="apple-touch-icon" href="icon-192.png" sizes="192x192">
 <meta name="mrbd-web-app-capable" content="yes">
 <title>CWB Co-Pilot na lente · hub</title></head><body>
-<div id="app"></div>
-<input id="t" type="text" aria-label="Fale ou digite">
+<div id="app" tabindex="-1"></div>
+<input id="t" type="text" tabindex="-1" disabled aria-label="Fale ou digite">
 <script>(function(){
 const CSS=`*{box-sizing:border-box;margin:0;padding:0}
 html,body{width:600px;height:600px;background:#000;overflow:hidden;font-family:-apple-system,system-ui,"Segoe UI",sans-serif;font-weight:600;color:#eef1f5}
@@ -219,7 +224,8 @@ function sbar(){const e=$('#scr'),b=$('#app .sb'),m=$('#app .more');if(!e||!b)re
 function scrollBy(d){const e=$('#scr');e.scrollTop+=d;setTimeout(sbar,350)}
 function L(){const sc=$('#scr');let a=sc?[...sc.querySelectorAll('.fx')]:[];if(sc&&!a.length&&sc.scrollHeight>sc.clientHeight+4)a=[sc];return [...a,...document.querySelectorAll('#vb .fx,#nb .fx')]}
 function mark(){const sc0=$('#scr');if(sc0&&!L().includes(sc0))sc0.classList.remove('f');const nv=$('#nb .nav');if(nv){const c=L()[fi];nv.classList.toggle('cmp',!!(c&&c.closest('#scr')))}L().forEach((e,i)=>{e.classList.toggle('f',i===fi);if(i===fi&&e.id!=='scr'&&e.closest('#scr')&&e.scrollIntoView){const sc=e.closest('#scr'),fx=sc.querySelectorAll('.fx');if(e===fx[fx.length-1])sc.scrollTop=sc.scrollHeight;else e.scrollIntoView({block:'nearest',behavior:'smooth'})}});setTimeout(sbar,350)}
-function go(s,keep){scr=s;const el=$('#scr');el.style.animation='none';el.offsetHeight;el.style.animation='';el.innerHTML=V[s]();el.scrollTop=0;$('#vb').innerHTML=voice();$('#nb').innerHTML=nav(TAB[s]||'Home');sbar();if(!keep)fi=Math.max(0,L().findIndex(e=>e.dataset.a==='talk'));if(fi>=L().length)fi=0;mark();A.forEach(a=>a.justShot=false)}
+function arm(){try{if(scr!=='home'&&!(history.state&&history.state.lens))history.pushState({lens:1},'')}catch(e){}}
+function go(s,keep){scr=s;arm();const el=$('#scr');el.style.animation='none';el.offsetHeight;el.style.animation='';el.innerHTML=V[s]();el.scrollTop=0;$('#vb').innerHTML=voice();$('#nb').innerHTML=nav(TAB[s]||'Home');sbar();if(!keep)fi=Math.max(0,L().findIndex(e=>e.dataset.a==='talk'));if(fi>=L().length)fi=0;mark();A.forEach(a=>a.justShot=false)}
 function toast(t,s){const d=document.createElement('div');d.className='toast';d.innerHTML=`<div class="ic u">${I('msg')}</div><div class="tx"><div class="a">${t}</div><div class="s">${s}</div></div>`;$('#app').appendChild(d);setTimeout(()=>d.remove(),5200)}
 const areaOf=t=>/banh|bath/.test(t)?2:/cozinh|kitch/.test(t)?1:/sala|living/.test(t)?0:null;
 // Stand-in for Claude: on the real setup the words go to Claude Code on the Mac, which answers and picks the screen.
@@ -279,11 +285,26 @@ function hubIntent(t,raw){
  return null}
 function ovShow(){const p=S.pend;if(!p)return;const d=document.createElement('div');d.id='ov';d.innerHTML=`<div class="k">${p.k}</div><div class="t">${p.t}</div><div class="bx">${p.b}</div><div class="hint"><div class="y" data-o="1">${I('check',16)} Pinça: aprovar</div><div data-o="0">Voltar: cancelar</div></div><div class="sm">Nada sai sem esse toque.</div>`;$('#app').appendChild(d)}
 function ovEnd(yes){const p=S.pend;S.pend=null;const d=$('#ov');if(d)d.remove();let c,s;if(yes){[c,s]=p.ok()}else{c='Cancelado. Nada foi feito.';s=scr}said={u:yes?'(pinça) aprovar':'(voltar) cancelar',c};vs='ans';go(s)}
+const PONTE=(()=>{try{const q=new URLSearchParams(location.search);if(q.get('desligaponte')!==null){localStorage.removeItem('cwbPonte');localStorage.removeItem('cwbChave')}
+ const u=q.get('ponte');if(u&&/^https:\/\/[^\/]+\.ts\.net\/?$/.test(u)){localStorage.setItem('cwbPonte',u.replace(/\/$/,''));localStorage.setItem('cwbChave',q.get('chave')||'')}
+ if(u||q.get('chave')!==null||q.get('desligaponte')!==null)history.replaceState(null,'',location.pathname);
+ return{u:localStorage.getItem('cwbPonte'),k:localStorage.getItem('cwbChave')}}catch(e){return{}}})();
+const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+// With the bridge on, free questions go to Claude Code on the Mac; screen moves, scroll and the test flows stay local.
+function pergunta(text){
+ if(!PONTE.u)return Promise.resolve(claude(text));
+ let loc=null;if(scr!=='claude'){loc=claude(text);if(!/^(Não entendi|Qual área)/.test(loc[0]))return Promise.resolve(loc)}
+ const ac=new AbortController();const tm=setTimeout(()=>ac.abort(),60000);
+ return fetch(PONTE.u+'/perguntar',{method:'POST',headers:{'Content-Type':'application/json','X-Chave':PONTE.k||''},body:JSON.stringify({texto:text,tela:scr}),signal:ac.signal})
+  .then(r=>r.json().then(j=>{if(!r.ok)throw new Error(j.erro||r.status);return j}))
+  .then(j=>{const tela=V[j.tela]?j.tela:'claude';S.lastQ=esc(text);S.lastA=esc(j.fala);return[esc(j.fala),tela]})
+  .catch(e=>['O Mac não respondeu ('+esc(e.message||'sem conexão')+'). '+(loc?loc[0]:'Tente de novo.'),scr])
+  .finally(()=>clearTimeout(tm))}
 function hear(text){if(busy)return;busy=true;said={u:'',c:''};vs='lst';setVoice();let i=0;
- const tick=setInterval(()=>{i+=2;said.u=text.slice(0,i);setVoice();if(i>=text.length){clearInterval(tick);setTimeout(()=>{vs='thk';setVoice();setTimeout(()=>{const [c,s]=claude(text);said={u:text,c};vs='ans';go(s);busy=false;ovShow();
-  if(si===7&&s==='visita'&&!S.toasted){S.toasted=1;setTimeout(()=>toast('Lead novo · Paula Teste','Thumbtack · Claude já preparou a resposta'),900)}},650)},250)}},45)}
+ const tick=setInterval(()=>{i+=2;said.u=text.slice(0,i);setVoice();if(i>=text.length){clearInterval(tick);setTimeout(()=>{vs='thk';setVoice();setTimeout(()=>{pergunta(text).then(([c,s])=>{said={u:text,c};vs='ans';go(s);busy=false;ovShow();
+  if(si===7&&s==='visita'&&!S.toasted){S.toasted=1;setTimeout(()=>toast('Lead novo · Paula Teste','Thumbtack · Claude já preparou a resposta'),900)}})},650)},250)}},45)}
 function act(a){if(a==='talk'){const t=$('#t');if(t.value.trim()){hear(t.value.trim());t.value='';return}
-  if(si<SCRIPT.length)return hear(SCRIPT[si++]);vs='idle';said={u:'',c:'Fim da demonstração. Digite um comando (o teclado faz o papel da voz).'};t.focus();return setVoice()}
+  if(si<SCRIPT.length)return hear(SCRIPT[si++]);vs='idle';said={u:'',c:'Fim da demonstração. Digite um comando (o teclado faz o papel da voz).'};t.disabled=false;t.focus();return setVoice()}
  if(a.startsWith('say:'))return hear(a.slice(4));
  if(a.startsWith('area:')){cur=+a.slice(5);vs='idle';said={u:'',c:'Diga "anota…", "tira uma foto" ou "mostra a planta".'};return go('area')}
  if(a==='approveSave')return hear('Aprova');
@@ -299,7 +320,7 @@ function key(e){if(S.pend&&$('#ov')){e.stopImmediatePropagation();e.preventDefau
  else if(e.key==='ArrowUp'){fi=inNav?vi:Math.max(fi-1,0);mark();e.preventDefault()}
  else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){const c=TABN.indexOf(TAB[scr]||'Home');const n=(c+(e.key==='ArrowRight'?1:-1)+5)%5;act(TABS[n]);const nv=[...document.querySelectorAll('#nb .fx')][n];fi=L().indexOf(nv);mark();e.preventDefault()}
  else if(e.key==='Enter'){const el=l[fi];if(el&&el.dataset.a)act(el.dataset.a);e.preventDefault()}
- else if(e.key==='Escape'||e.key==='Backspace'){if(inT)$('#t').blur();act(BACK[scr]||(cur!==null?'area:'+cur:'visita'));e.preventDefault()}}
+ else if(e.key==='Escape'||e.key==='Backspace'){if(inT){$('#t').blur();$('#t').disabled=true}act(BACK[scr]||(cur!==null?'area:'+cur:'visita'));e.preventDefault()}}
 function clk(e){const o=e.target.closest&&e.target.closest('#ov [data-o]');if(o){e.stopImmediatePropagation();return ovEnd(o.dataset.o==='1')}const el=e.target.closest&&e.target.closest('#app .fx');if(el){e.stopImmediatePropagation();fi=L().indexOf(el);act(el.dataset.a)}}
 if(window.__lensKey){window.removeEventListener('keydown',window.__lensKey,true);window.removeEventListener('click',window.__lensClk,true)}
 window.__lensKey=key;window.__lensClk=clk;
@@ -308,5 +329,5 @@ if(!window.__lensPop){window.__lensPop=1;window.addEventListener('popstate',e=>{
 window.__lensDemo=()=>({scr,si,fi,ov:!!S.pend});window.__lensGo=s=>{S.pend=null;const d=$('#ov');if(d)d.remove();act(s)};window.__lensSay=t=>hear(t);document.getElementById('scr').addEventListener('scroll',()=>sbar());
 document.title='CWB Co-Pilot na lente · hub';
 go('home');
-})();
-</script></body></html>
+try{const ap=document.getElementById('app');ap.setAttribute('tabindex','-1');ap.focus({preventScroll:true})}catch(e){}
+})();</script></body></html>
