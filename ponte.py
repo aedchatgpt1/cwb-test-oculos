@@ -142,10 +142,13 @@ def abrir_funnel():
     except Exception as e:
         print("Não consegui ler o nome do Mac no Tailscale:", e)
         return None
-    r = subprocess.run([ts, "funnel", "--bg", str(PORTA)], capture_output=True, text=True, timeout=60)
-    saida = (r.stdout + r.stderr).strip()
-    if saida:
-        print(saida)
+    print("Abrindo a ponte na internet pelo Tailscale. Se aparecer um link, abra no navegador e aprove.", flush=True)
+    try:
+        # Sem capturar a saída: o link de aprovação do Funnel aparece direto na tela.
+        r = subprocess.run([ts, "funnel", "--bg", str(PORTA)], timeout=300)
+    except subprocess.TimeoutExpired:
+        print("\nO Tailscale não respondeu em 5 minutos. Aprove o link acima e rode a ponte de novo.")
+        return None
     if r.returncode != 0:
         print("\nO Funnel ainda não está liberado. Abra o link acima, aprove e rode a ponte de novo.")
         return None
