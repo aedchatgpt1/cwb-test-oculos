@@ -51,7 +51,9 @@ def perguntar(texto, tela_atual):
            "WebFetch", "WebSearch", "Task"]
     if sessao["id"]:
         cmd += ["--resume", sessao["id"]]
-    r = subprocess.run(cmd, cwd=TRABALHO, capture_output=True, text=True, timeout=90)
+    # Sem chave de API: força o uso da assinatura, nunca cobrança por API.
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    r = subprocess.run(cmd, cwd=TRABALHO, capture_output=True, text=True, timeout=90, env=env)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.strip()[:300] or "claude falhou")
     saida = json.loads(r.stdout)
