@@ -303,7 +303,8 @@ function pergunta(text){
 function hear(text){if(busy)return;busy=true;said={u:'',c:''};vs='lst';setVoice();let i=0;
  const tick=setInterval(()=>{i+=2;said.u=text.slice(0,i);setVoice();if(i>=text.length){clearInterval(tick);setTimeout(()=>{vs='thk';setVoice();setTimeout(()=>{pergunta(text).then(([c,s])=>{said={u:text,c};vs='ans';go(s);busy=false;ovShow();
   if(si===7&&s==='visita'&&!S.toasted){S.toasted=1;setTimeout(()=>toast('Lead novo · Paula Teste','Thumbtack · Claude já preparou a resposta'),900)}})},650)},250)}},45)}
-function act(a){if(a==='talk'){const t=$('#t');if(t.value.trim()){hear(t.value.trim());t.value='';return}
+function act(a){if(a==='talk'){const t=$('#t');if(t.value.trim()){const v=t.value.trim();t.value='';if(PONTE.u){t.blur();t.disabled=true}hear(v);return}
+  if(PONTE.u){t.disabled=false;t.focus();vs='idle';said={u:'',c:'Fale a pergunta. Vai para o Claude no seu Mac.'};return setVoice()}
   if(si<SCRIPT.length)return hear(SCRIPT[si++]);vs='idle';said={u:'',c:'Fim da demonstração. Digite um comando (o teclado faz o papel da voz).'};t.disabled=false;t.focus();return setVoice()}
  if(a.startsWith('say:'))return hear(a.slice(4));
  if(a.startsWith('area:')){cur=+a.slice(5);vs='idle';said={u:'',c:'Diga "anota…", "tira uma foto" ou "mostra a planta".'};return go('area')}
@@ -330,4 +331,5 @@ window.__lensDemo=()=>({scr,si,fi,ov:!!S.pend});window.__lensGo=s=>{S.pend=null;
 document.title='CWB Co-Pilot na lente · hub';
 go('home');
 try{const ap=document.getElementById('app');ap.setAttribute('tabindex','-1');ap.focus({preventScroll:true})}catch(e){}
+$('#t').addEventListener('change',()=>{if($('#t').value.trim())act('talk')});
 })();</script></body></html>
