@@ -225,7 +225,7 @@ function scrollBy(d){const e=$('#scr');e.scrollTop+=d;setTimeout(sbar,350)}
 function L(){const sc=$('#scr');let a=sc?[...sc.querySelectorAll('.fx')]:[];if(sc&&!a.length&&sc.scrollHeight>sc.clientHeight+4)a=[sc];return [...a,...document.querySelectorAll('#vb .fx,#nb .fx')]}
 function mark(){const sc0=$('#scr');if(sc0&&!L().includes(sc0))sc0.classList.remove('f');const nv=$('#nb .nav');if(nv){const c=L()[fi];nv.classList.toggle('cmp',!!(c&&c.closest('#scr')))}L().forEach((e,i)=>{e.classList.toggle('f',i===fi);if(i===fi&&e.id!=='scr'&&e.closest('#scr')&&e.scrollIntoView){const sc=e.closest('#scr'),fx=sc.querySelectorAll('.fx');if(e===fx[fx.length-1])sc.scrollTop=sc.scrollHeight;else e.scrollIntoView({block:'nearest',behavior:'smooth'})}});setTimeout(sbar,350)}
 function arm(){try{if(scr!=='home'&&!(history.state&&history.state.lens))history.pushState({lens:1},'')}catch(e){}}
-function go(s,keep){scr=s;arm();const el=$('#scr');el.style.animation='none';el.offsetHeight;el.style.animation='';el.innerHTML=V[s]();el.scrollTop=0;$('#vb').innerHTML=voice();$('#nb').innerHTML=nav(TAB[s]||'Home');sbar();if(!keep)fi=Math.max(0,L().findIndex(e=>e.dataset.a==='talk'));if(fi>=L().length)fi=0;mark();A.forEach(a=>a.justShot=false)}
+function go(s,keep){scr=s;arm();if(PONTE.u&&REAL.hasOwnProperty(s))carregar(s);const el=$('#scr');el.style.animation='none';el.offsetHeight;el.style.animation='';el.innerHTML=V[s]();el.scrollTop=0;$('#vb').innerHTML=voice();$('#nb').innerHTML=nav(TAB[s]||'Home');sbar();if(!keep)fi=Math.max(0,L().findIndex(e=>e.dataset.a==='talk'));if(fi>=L().length)fi=0;mark();A.forEach(a=>a.justShot=false)}
 function toast(t,s){const d=document.createElement('div');d.className='toast';d.innerHTML=`<div class="ic u">${I('msg')}</div><div class="tx"><div class="a">${t}</div><div class="s">${s}</div></div>`;$('#app').appendChild(d);setTimeout(()=>d.remove(),5200)}
 const areaOf=t=>/banh|bath/.test(t)?2:/cozinh|kitch/.test(t)?1:/sala|living/.test(t)?0:null;
 // Stand-in for Claude: on the real setup the words go to Claude Code on the Mac, which answers and picks the screen.
@@ -291,9 +291,26 @@ const PONTE=(()=>{try{const q=new URLSearchParams(location.search);if(q.get('des
  return{u:localStorage.getItem('cwbPonte'),k:localStorage.getItem('cwbChave')}}catch(e){return{}}})();
 const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 // With the bridge on, free questions go to Claude Code on the Mac; screen moves, scroll and the test flows stay local.
+
+const REAL={clients:null,jobs:null,inbox:null},REAL_ERR={},REAL_T={};
+function carregar(t){if(REAL_T[t]&&Date.now()-REAL_T[t]<30000)return;REAL_T[t]=Date.now();
+ const ac=new AbortController();const tm=setTimeout(()=>ac.abort(),25000);
+ fetch(PONTE.u+'/dados?tela='+t,{headers:{'X-Chave':PONTE.k||''},signal:ac.signal})
+  .then(r=>r.json().then(j=>{if(!r.ok)throw new Error(j.erro||r.status);return j}))
+  .then(j=>{REAL[t]=Array.isArray(j.itens)?j.itens:[];delete REAL_ERR[t]})
+  .catch(e=>{REAL_ERR[t]=String(e.message||'sem conexão');REAL_T[t]=Date.now()-20000})
+  .finally(()=>{clearTimeout(tm);if(scr===t)go(t,1)})}
+const ETAPA={new:'Novo',lead:'Lead',contacted:'Contatado',visit_scheduled:'Visita marcada',estimate_sent:'Orçamento enviado',won:'Fechado',lost:'Perdido',in_progress:'Em andamento',scheduled:'Agendado',pending:'Pendente',active:'Ativo'};
+const et=x=>esc(ETAPA[x]||String(x||'').replace(/_/g,' '));
+const dt=x=>{const m=String(x||'').match(/^(\d{4})-(\d\d)-(\d\d)(?:T(\d\d):(\d\d))?/);return m?`${m[3]}/${m[2]}${m[4]?' '+m[4]+':'+m[5]:''}`:''};
+const subt=(t,n,lab)=>REAL[t]?`${n} ${lab} · do CRM`:REAL_ERR[t]?`Exemplo · CRM: ${esc(REAL_ERR[t])}`:'Carregando do CRM…';
+const _V={clients:V.clients,jobs:V.jobs,inbox:V.inbox};
+V.clients=()=>!PONTE.u||!REAL.clients?(PONTE.u?_V.clients().replace('3 de teste',subt('clients')):_V.clients()):`${small('Home','Clients',subt('clients',REAL.clients.length,'clientes'))}<div class="card grow">${REAL.clients.length?REAL.clients.map(c=>row('user',0,esc(c.nome),[et(c.etapa),esc(c.origem),dt(c.desde)].filter(Boolean).join(' · '),null,'say:Me fala do cliente '+esc(c.nome)+'.')).join(''):'<div class="sec">Nenhum cliente no CRM.</div>'}</div>`;
+V.jobs=()=>!PONTE.u||!REAL.jobs?(PONTE.u?_V.jobs().replace('2 em andamento · 1 começando',subt('jobs')):_V.jobs()):`${small('Home','Jobs',subt('jobs',REAL.jobs.length,'abertos'))}<div class="card grow">${REAL.jobs.length?REAL.jobs.map((j,i)=>row('ham',0,esc(j.cliente)+' · '+esc(j.titulo),[et(j.status),j.progresso?j.progresso+'%':'',j.inicio?'início '+dt(j.inicio):''].filter(Boolean).join(' · '),null,'say:Como está o job '+esc(j.titulo)+' do '+esc(j.cliente)+'?',i==0?'g':'')).join(''):'<div class="sec">Nenhum job aberto no CRM.</div>'}</div>`;
+V.inbox=()=>!PONTE.u||!REAL.inbox?(PONTE.u?_V.inbox().replace(/<div class="date"[^>]*>[^<]*<\/div>/,`<div class="date" style="margin-top:1px">${subt('inbox')}</div>`):_V.inbox()):`${small('Home','Inbox',subt('inbox',REAL.inbox.length,'recebidas'))}<div class="card grow">${REAL.inbox.length?REAL.inbox.map(m=>`<div class="it fx" data-a="say:${'Me resume a mensagem de '+esc(m.de)}"><div class="ic">${I(m.canal=='email'?'mail':'msg')}</div><div class="tx"><div class="a">${esc(m.de)} <span style="font-size:11px;color:#8fa1b6">· ${esc(m.canal)} · ${dt(m.quando)}</span></div><div class="s">${esc(m.texto)}</div></div>${m.aprovar?'<span class="chip">aprovar no CRM</span>':''}</div>`).join(''):'<div class="sec">Nenhuma mensagem recebida.</div>'}</div>`;
 function pergunta(text){
  if(!PONTE.u)return Promise.resolve(claude(text));
- let loc=null;if(scr!=='claude'){loc=claude(text);if(!/^(Não entendi|Qual área)/.test(loc[0]))return Promise.resolve(loc)}
+ let loc=null;if(scr!=='claude'){loc=claude(text);const nav=/^(abr[ae]|abrir|mostra|vai|volta)\b.{0,12}\b(home|inbox|clientes|jobs|mensagens|more|mais)\W*$/i.test(text.trim());const crm=['clients','client','maria','jobs','inbox','approve','briefing','claude'].includes(loc[1]);if(!/^(Não entendi|Qual área)/.test(loc[0])&&(nav||!crm))return Promise.resolve(loc)}
  const ac=new AbortController();const tm=setTimeout(()=>ac.abort(),60000);
  return fetch(PONTE.u+'/perguntar',{method:'POST',headers:{'Content-Type':'application/json','X-Chave':PONTE.k||''},body:JSON.stringify({texto:text,tela:scr}),signal:ac.signal})
   .then(r=>r.json().then(j=>{if(!r.ok)throw new Error(j.erro||r.status);return j}))
